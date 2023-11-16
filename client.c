@@ -211,7 +211,7 @@ void regis(){
 					}
 				}
 				if(key >= 32 && key <= 126){
-					if(userPWCursorPosition < 30){
+					if(userPWCursorPosition < 32){
 						mvwaddch(regis_window, 6, userPWCursorPosition, key);
 						wrefresh(regis_window);
 						regis_password[userPWCursorPosition - 12] = key;
@@ -414,7 +414,7 @@ void login(){
 					}
 				}
 				if(key >= 32 && key <= 126){
-					if(userPWCursorPosition < 30){
+					if(userPWCursorPosition < 32){
 						mvwaddch(login_window, 6, userPWCursorPosition, '*');
 						wrefresh(login_window);
 						password[userPWCursorPosition - 12] = key;
@@ -616,7 +616,7 @@ void new_chat(){
 	    	}
 		}
 		if(key >= 32 && key <= 126){
-			if(nameCursor < 33){
+			if(nameCursor < 32){
 				mvwaddch(new_room, 2, nameCursor, key);
 				wrefresh(new_room);
 				name_tmp[nameCursor - 12] = key;
@@ -1061,7 +1061,7 @@ int main(){
 								}
 							}
 							if(key >= 32 && key <= 126){
-								if(rpCursor < 46){
+								if(rpCursor < 36){
 									mvwaddch(check_pass, 2, rpCursor, '*');
 									wrefresh(check_pass);
 									roomP[rpCursor - 16] = key;
@@ -1079,10 +1079,12 @@ int main(){
 						}
 					}
 					if(key >= 49 && key <= 57){
-						mvaddch(30, roomCursor, key);
-						refresh();
-						roomNum[roomCursor - 1] = key;
-						roomCursor++;
+						if(roomCursor < 6){
+							mvaddch(30, roomCursor, key);
+							refresh();
+							roomNum[roomCursor - 1] = key;
+							roomCursor++;
+						}						
 					}
 				}
 			}
