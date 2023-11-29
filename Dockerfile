@@ -24,7 +24,8 @@ RUN apt-get update && apt-get install -y \
     git \
     zlib1g-dev \
     wget \
-    libncurses5-dev
+    libncurses5-dev \
+    libssl-dev
 
 ####################
 # Build-Client

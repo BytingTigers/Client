@@ -3,7 +3,7 @@ CFLAGS=-g -Wall
 LDFLAGS=
 OBJS=client.o
 TARGET=client
-LIBS=-lncurses
+LIBS=-lncurses -lcrypto
 
 all: $(TARGET) clean_object
 
