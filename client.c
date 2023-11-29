@@ -6,10 +6,14 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/select.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #define BUFFER_SIZE 4096
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 5001
+#define AES_BLOCK_SIZE 16
+#define SECRET_KEY "OP0GVA1ABbK04hC46NkEYsBAykjUNe0dvf+COdW/YGI="
 
 char userID[30] = "";
 char password[20] = "";
@@ -30,6 +34,69 @@ char jwt[200];
 char name_tmp[20];
 char pass_tmp[20];
 int room_cnt = 0;
+
+
+void ssl_send(unsigned char *plaintext, int sockfd)
+{
+    int plaintext_len = strlen((char*)plaintext), ciphertext_len = 0;
+    unsigned char buffer[BUFFER_SIZE + AES_BLOCK_SIZE + AES_BLOCK_SIZE]; // ciphertext + padding + iv
+    unsigned char ciphertext[BUFFER_SIZE + 16];
+    unsigned char iv[AES_BLOCK_SIZE];
+    RAND_bytes(iv, sizeof(iv));
+
+    EVP_CIPHER_CTX *ctx;
+    int len;
+
+    ctx = EVP_CIPHER_CTX_new();
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, SECRET_KEY, iv);
+
+    EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len);
+    ciphertext_len = len;
+
+    EVP_EncryptFinal_ex(ctx, ciphertext + len, &len);
+    ciphertext_len += len;
+
+    EVP_CIPHER_CTX_free(ctx);
+
+    memset(buffer, 0, sizeof(buffer));
+    memcpy(buffer, ciphertext, ciphertext_len);
+    memcpy(buffer + BUFFER_SIZE, iv, AES_BLOCK_SIZE);
+    send(sockfd, buffer, sizeof(buffer), NULL);
+}
+
+void ssl_recv(unsigned char *plaintext, int sockfd)
+{
+    unsigned char iv[AES_BLOCK_SIZE];
+    unsigned char buffer[BUFFER_SIZE + AES_BLOCK_SIZE + AES_BLOCK_SIZE]; // ciphertext + padding + iv
+    unsigned char ciphertext[BUFFER_SIZE + AES_BLOCK_SIZE];
+
+    int ciphertext_len = 0, plaintext_len = 0;
+    int recv_len = recv(sockfd, buffer, sizeof(buffer), 0);
+
+    if(recv_len < 0){
+        plaintext = NULL;
+        return;
+    }
+    ciphertext_len = recv_len - AES_BLOCK_SIZE;
+
+    memcpy(iv, buffer + BUFFER_SIZE + AES_BLOCK_SIZE, AES_BLOCK_SIZE);
+    memcpy(ciphertext, buffer, BUFFER_SIZE + AES_BLOCK_SIZE);
+
+    EVP_CIPHER_CTX *ctx;
+    int len;
+
+    ctx = EVP_CIPHER_CTX_new();
+    EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, SECRET_KEY, iv);
+
+    EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len);
+    plaintext_len = len;
+
+    EVP_DecryptFinal_ex(ctx, plaintext + len, &len);
+    plaintext_len += len;
+
+    EVP_CIPHER_CTX_free(ctx);
+    plaintext[plaintext_len] = '\0';
+}
 
 void init_scr(){
     initscr();
@@ -165,9 +232,9 @@ void regis(){
 						exit(EXIT_FAILURE);
 					}
 					snprintf(IDPW_regis, sizeof(IDPW_regis), "1.%s.%s", regis_id, regis_password);	
-					write(sockfd, IDPW_regis, strlen(IDPW_regis));		
+					ssl_send(IDPW_regis, sockfd);
 					char return_val[20];
-					int recv_len = read(sockfd, return_val, sizeof(return_val));
+					ssl_recv(return_val, sockfd);
 					if(strcmp(return_val , "ERROR_QUIT") == 0){
 						WINDOW *err = newwin(10, 35, 13, 28);
 						wbkgd(err, COLOR_PAIR(2));
@@ -198,7 +265,6 @@ void regis(){
 							}
 						}
 					}
-					return_val[recv_len] = '\0';
 					close(sockfd);
 					break;
 				}
@@ -398,10 +464,9 @@ void login(){
 						return;
 					}								
 					snprintf(IDPW, sizeof(IDPW), "2.%s.%s", userID, password);
-					write(sockfd, IDPW, sizeof(IDPW));
-					int recv_len = read(sockfd, jwt, sizeof(jwt));
+					ssl_send(IDPW, sockfd);
 
-					jwt[recv_len] = '\0';
+					ssl_recv(jwt, sockfd);
 					close(sockfd);
 					break;
 				}				
@@ -541,11 +606,10 @@ void new_chat(){
 						continue;
 					}
 					snprintf(send_buffer, sizeof(send_buffer), "make:%s:%s", name_tmp, pass_tmp);
-					write(sockfd, send_buffer, strlen(send_buffer));
+					ssl_send(send_buffer, sockfd);
 					memset(send_buffer, 0, sizeof(send_buffer));
 
-					int recv_len = read(sockfd, recv_buffer, sizeof(recv_buffer));
-					recv_buffer[recv_len] = '\0';
+					ssl_recv(recv_buffer, sockfd);
 
 					if(strcmp(recv_buffer, "SUCCESS") != 0){
 
@@ -628,7 +692,7 @@ void new_chat(){
 
 void chat_list(WINDOW *list){
 	int key;
-    write(sockfd, "list", 4);
+	ssl_send("list", sockfd);
     wclear(list);
     wrefresh(list);
 	scrollok(list, TRUE);
@@ -637,7 +701,8 @@ void chat_list(WINDOW *list){
     mvprintw(30, 0, ">");
     refresh();
     memset(recv_buffer, 0, sizeof(recv_buffer));
-    int recv_len = read(sockfd, recv_buffer, sizeof(recv_buffer));
+
+	ssl_recv(recv_buffer, sockfd);
 
 	if(strcmp(recv_buffer, "ERROR_QUIT") == 0){
 		WINDOW *err = newwin(10, 35, 13, 28);
@@ -681,7 +746,7 @@ void chat_list(WINDOW *list){
 		}
 		return;
 	}
-    recv_buffer[recv_len] = '\0';
+
     refresh();
     char *token;
     token = strtok(recv_buffer, ".");
@@ -727,7 +792,6 @@ void chat(int room_num){
 	
     int key;
     int inputCursor = 1;
-	int recv_len;
     while(1){
 		FD_ZERO(&read_fds);
 		FD_SET(STDIN_FILENO, &read_fds);
@@ -750,7 +814,7 @@ void chat(int room_num){
 
 			if(key == KEY_F(1)){
 				memset(recv_buffer, 0, sizeof(recv_buffer));
-				write(sockfd, "leave", 5);
+				ssl_send("leave", sockfd);
 				wclear(msg);
 				wrefresh(msg);
 				delwin(msg);
@@ -782,7 +846,7 @@ void chat(int room_num){
 					continue;
 				}	
 				snprintf(send_buffer, sizeof(send_buffer), "send:%s", message);
-				write(sockfd, send_buffer, strlen(send_buffer));
+				ssl_send(send_buffer, sockfd);
 				memset(send_buffer, 0, sizeof(send_buffer));
 				
 				wclear(chat_bar);
@@ -810,7 +874,11 @@ void chat(int room_num){
 		}
 
 		if(FD_ISSET(sockfd, &read_fds)){
-			int recv_len = read(sockfd, recv_buffer, sizeof(recv_buffer));
+			ssl_recv(recv_buffer, sockfd);
+
+			if(recv_buffer == NULL)
+				break;
+
 			if(strcmp(recv_buffer, "ERROR_QUIT") == 0){
 				WINDOW *err = newwin(10, 35, 13, 28);
 				wbkgd(err, COLOR_PAIR(2));
@@ -828,18 +896,10 @@ void chat(int room_num){
 					}
 				}
 			}
-			if(recv_len > 0){
-				recv_buffer[recv_len] = '\0';
-				wprintw(msg, recv_buffer);
-				wrefresh(msg);
-				memset(recv_buffer, 0, sizeof(recv_buffer));
-			}
-			else if(recv_len == 0)
-				break;
-			else{
-				perror("recv");
-				break;
-			}
+
+			wprintw(msg, recv_buffer);
+			wrefresh(msg);
+			memset(recv_buffer, 0, sizeof(recv_buffer));
 		}       						
     }
 }
@@ -909,9 +969,9 @@ int main(){
 		}
 
 		snprintf(send_buffer, sizeof(send_buffer), "auth:%s:%s", userID, jwt);
-		write(sockfd, send_buffer, strlen(send_buffer));
+		ssl_send(send_buffer, sockfd);
 		memset(send_buffer, 0, sizeof(send_buffer));
-		int recv_len = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
+		ssl_recv(send_buffer, sockfd);
 		if(strcmp(recv_buffer, "SUCCESS") != 0){
 			printf("authentication failed");
 			endwin();
@@ -992,9 +1052,9 @@ int main(){
 							if(key == '\n'){
 								refresh();
 								snprintf(send_buffer, sizeof(send_buffer), "join:%s:%s", roomName[atoi(roomNum) - 1], roomP);
-								write(sockfd, send_buffer, strlen(send_buffer));
+								ssl_send(send_buffer, sockfd);
 								memset(send_buffer, 0, sizeof(send_buffer));
-								int recv_len = read(sockfd, recv_buffer, sizeof(recv_buffer));
+								ssl_recv(recv_buffer, sockfd);
 								if(strcmp(recv_buffer, "ERROR_QUIT") == 0){
 									WINDOW *err = newwin(10, 35, 13, 28);
 									wbkgd(err, COLOR_PAIR(2));
