@@ -107,7 +107,8 @@ void ssl_recv(unsigned char *plaintext, int sockfd)
     EVP_CIPHER_CTX_free(ctx);
     plaintext_buffer[plaintext_len] = '\0';
 
-    memcpy(plaintext, plaintext_buffer, strlen((char*)plaintext_buffer));
+	memset(plaintext, 0, sizeof(plaintext));
+    strncpy(plaintext, plaintext_buffer, plaintext_len);
 }
 
 void init_scr(){
