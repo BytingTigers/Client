@@ -23,7 +23,7 @@ char *roomName[128] = {};
 char *roomPass[128] = {};
 bool exit_flag = false;
 bool no_room = false;
-char message[1000];
+
 char send_buffer[BUFFER_SIZE];
 char recv_buffer[BUFFER_SIZE];
 int sockfd;
@@ -792,6 +792,7 @@ void show_bar(WINDOW *bar){
 }
 
 void chat(int room_num){
+	char message[1000];
     WINDOW *chat_bar = newwin(1, 60, 30, 0);    
     wrefresh(chat_bar);
 	WINDOW *msg = newwin(28, 80, 0, 0);
@@ -803,6 +804,7 @@ void chat(int room_num){
 	wattroff(msg, A_BOLD);
 	wrefresh(msg);
     show_bar(chat_bar);
+	memset(message, 0, sizeof(message));
 	
 	fd_set read_fds;
 	int maxfd;
