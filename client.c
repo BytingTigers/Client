@@ -927,7 +927,7 @@ void chat(int room_num){
 				}
 			}
 
-			wprintw(msg, recv_buffer);
+			wprintw(msg, "%s", recv_buffer);
 			wrefresh(msg);
 			memset(recv_buffer, 0, sizeof(recv_buffer));
 		}       						
