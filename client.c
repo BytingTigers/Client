@@ -23,9 +23,6 @@ char *roomName[128] = {};
 char *roomPass[128] = {};
 bool exit_flag = false;
 bool no_room = false;
-
-char send_buffer[BUFFER_SIZE];
-char recv_buffer[BUFFER_SIZE];
 int sockfd;
 struct sockaddr_in auth_addr;
 struct sockaddr_in chat_addr;
@@ -141,6 +138,8 @@ void init_scr(){
 }
 
 void regis(){
+	char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
 	mvprintw(27, 70, "Press F1 to quit");
 	mvprintw(28, 70, "                    ");
 	mvprintw(28,70, "Press F2 to login");
@@ -349,6 +348,8 @@ void regis(){
 }
 
 void login(){    
+	char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
 	mvprintw(27, 70, "Press F1 to quit");
 	mvprintw(28,70, "Press F2 to register");
 	refresh();
@@ -547,6 +548,8 @@ void menu_window(){
 }
 
 void new_chat(){
+	char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
 	bool retry = false;
     int key;
     int nameCursor = 12;
@@ -709,6 +712,8 @@ void new_chat(){
 }
 
 void chat_list(WINDOW *list){
+	char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
 	int key;
 	ssl_send("list", sockfd);
     wclear(list);
@@ -792,6 +797,8 @@ void show_bar(WINDOW *bar){
 }
 
 void chat(int room_num){
+	char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
 	char message[1000];
     WINDOW *chat_bar = newwin(1, 60, 30, 0);    
     wrefresh(chat_bar);
@@ -931,7 +938,8 @@ int main(){
     init_scr();
     int key;
     bkgd(COLOR_PAIR(1));
-    
+    char send_buffer[BUFFER_SIZE];
+	char recv_buffer[BUFFER_SIZE];
     while(1){
     	move(10,40);
 		attron(A_BOLD);
